@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meme Partisi - 4 Kişilik Online Masa Oyunu</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0b0f19;
+      color: #f8fafc;
+      overflow-x: hidden;
+    }
+    .felt-table {
+      background: radial-gradient(circle at center, #14532d 0%, #064e3b 65%, #022c22 100%);
+      box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.75), 0 20px 50px rgba(0, 0, 0, 0.6);
+      border: 10px solid #451a03;
+    }
+    .active-turn-ring {
+      box-shadow: 0 0 0 3px #facc15, 0 0 25px rgba(250, 204, 21, 0.65);
+      animation: pulseGold 1.8s infinite;
+    }
+    @keyframes pulseGold {
+      0%, 100% { box-shadow: 0 0 0 3px #facc15, 0 0 18px rgba(250, 204, 21, 0.5); }
+      50% { box-shadow: 0 0 0 5px #fde047, 0 0 32px rgba(250, 204, 21, 0.9); }
+    }
+    .card-hover {
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+    }
+    .card-hover:hover {
+      transform: translateY(-10px) scale(1.03);
+      box-shadow: 0 18px 30px -10px rgba(0, 0, 0, 0.7);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Üst Navigasyon -->
+  <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center text-xl font-extrabold shadow-lg">
+          🃏
+        </div>
+        <div>
+          <h1 class="font-extrabold text-lg tracking-tight leading-none">MEME PARTİSİ</h1>
+          <span id="connection-status" class="text-[11px] text-amber-400 font-medium">Firebase'e bağlanılıyor...</span>
+        </div>
+      </div>
+
+      <nav class="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+        <button onclick="switchTab('table')" id="tab-btn-table" class="tab-btn px-4 py-1.5 rounded-lg text-sm font-semibold bg-amber-500 text-slate-950 transition">
+          Oyun Masası
+        </button>
+        <button onclick="switchTab('upload')" id="tab-btn-upload" class="tab-btn px-4 py-1.5 rounded-lg text-sm font-semibold text-slate-400 hover:text-white transition">
+          Meme Yükle
+        </button>
+        <button onclick="switchTab('pool')" id="tab-btn-pool" class="tab-btn px-4 py-1.5 rounded-lg text-sm font-semibold text-slate-400 hover:text-white transition">
+          Meme Havuzu (<span id="pool-count-badge">0</span>)
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Ana İçerik -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
+
+    <!-- SEKME 1: OYUN MASASI -->
+    <section id="tab-table" class="space-y-6">
+      
+      <!-- Lobi Ekranı (Odada değilken görünür) -->
+      <div id="lobby-view" class="max-w-2xl mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6">
+        <div class="text-center space-y-2">
+          <h2 class="text-2xl font-extrabold">4 Kişilik Çevrimiçi Masa</h2>
+          <p class="text-slate-400 text-sm">Olay kartı açılır, saat yönünde sırayla elindeki fotoğraf meme kartını ortaya atarsın ve en komik kart oylanır.</p>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Oyuncu Adın</label>
+            <input type="text" id="player-name-input" placeholder="Örn: Efe" maxlength="16"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-semibold focus:outline-none focus:border-amber-500" />
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <!-- Yeni Masa Kur -->
+            <div class="bg-slate-950/80 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+              <div class="space-y-2">
+                <h3 class="font-bold text-amber-400">Yeni Masa Oluştur</h3>
+                <p class="text-xs text-slate-400">Tur sayısını seç ve arkadaşlarınla oynayacağın odayı kur.</p>
+                <div class="pt-1">
+                  <label class="block text-[11px] font-semibold text-slate-400 mb-1">Toplam Tur Sayısı</label>
+                  <select id="total-rounds-select" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm font-semibold text-white focus:outline-none focus:border-amber-500">
+                    <option value="3">3 Tur (Hızlı Maç)</option>
+                    <option value="5" selected>5 Tur (Standart)</option>
+                    <option value="7">7 Tur (Uzun Maç)</option>
+                    <option value="10">10 Tur (Maraton)</option>
+                  </select>
+                </div>
+              </div>
+              <button onclick="createRoom()" class="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-sm transition shadow-lg shadow-amber-500/20">
+                Masa Kur
+              </button>
+            </div>
+
+            <!-- Var Olan Masaya Katıl -->
+            <div class="bg-slate-950/80 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+              <div class="space-y-2">
+                <h3 class="font-bold text-emerald-400">Odaya Katıl</h3>
+                <p class="text-xs text-slate-400">Arkadaşının paylaştığı 4 haneli masa kodunu gir.</p>
+                <div class="pt-1">
+                  <label class="block text-[11px] font-semibold text-slate-400 mb-1">Masa Kodu</label>
+                  <input type="text" id="join-code-input" placeholder="Örn: 4829" maxlength="4"
+                    class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-center tracking-widest font-extrabold text-lg uppercase text-white focus:outline-none focus:border-emerald-500" />
+                </div>
+              </div>
+              <button onclick="joinRoom()" class="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm transition shadow-lg shadow-emerald-500/20">
+                Masaya Otur
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="lobby-warning" class="hidden bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs p-3.5 rounded-xl text-center"></div>
+      </div>
+
+      <!-- Aktif Masa Görünümü -->
+      <div id="active-room-view" class="hidden space-y-5">
+        
+        <!-- Üst Oda Bilgi Çubuğu -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl px-5 py-3 flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-4">
+            <div class="bg-slate-950 border border-slate-800 px-3.5 py-1.5 rounded-xl">
+              <span class="text-[11px] text-slate-400 block">MASA KODU</span>
+              <span id="room-code-display" class="font-black text-lg tracking-widest text-amber-400">----</span>
+            </div>
+            <div>
+              <span id="round-indicator" class="text-xs font-bold uppercase tracking-wider text-emerald-400">Bekleme Odası</span>
+              <p id="turn-status-text" class="text-sm font-semibold text-slate-200">Oyuncular bekleniyor...</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2.5">
+            <button id="fill-bots-btn" onclick="fillWithBotsAndStart()" class="hidden px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition">
+              Boş Koltuklara Bot Ekle & Başlat
+            </button>
+            <button id="start-match-btn" onclick="startMatch()" class="hidden px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold transition">
+              Maçı Başlat
+            </button>
+            <button onclick="leaveRoom()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white text-xs font-bold transition">
+              Masadan Ayrıl
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 Kişilik Oyun Masası -->
+        <div class="felt-table rounded-[2.5rem] p-4 md:p-8 relative min-h-[540px] flex flex-col justify-between">
+          
+          <!-- KUZEY KOLTUĞU (Karşı Oyuncu) -->
+          <div class="flex justify-center">
+            <div id="seat-north" class="bg-slate-950/85 border border-slate-700/80 rounded-2xl px-4 py-2.5 min-w-[170px] text-center backdrop-blur-sm transition-all">
+              <span class="text-[10px] uppercase tracking-wider text-slate-400 block">Kuzey Koltuğu</span>
+              <div class="font-bold text-sm text-slate-300 mt-0.5">Boş Koltuk</div>
+              <div class="text-xs text-amber-400 font-bold mt-0.5">0 Puan</div>
+            </div>
+          </div>
+
+          <!-- ORTA SATIR: BATI - MASA MERKEZİ (OLAY + ATILAN KARTLAR) - DOĞU -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 items-center gap-4 my-4">
+            
+            <!-- BATI KOLTUĞU -->
+            <div class="lg:col-span-2 flex justify-center">
+              <div id="seat-west" class="bg-slate-950/85 border border-slate-700/80 rounded-2xl px-4 py-2.5 min-w-[155px] text-center backdrop-blur-sm transition-all">
+                <span class="text-[10px] uppercase tracking-wider text-slate-400 block">Batı Koltuğu</span>
+                <div class="font-bold text-sm text-slate-300 mt-0.5">Boş Koltuk</div>
+                <div class="text-xs text-amber-400 font-bold mt-0.5">0 Puan</div>
+              </div>
+            </div>
+
+            <!-- MASA MERKEZİ -->
+            <div class="lg:col-span-8 flex flex-col items-center space-y-5">
+              
+              <!-- Olay Kartı -->
+              <div class="w-full max-w-xl bg-slate-950/95 border-2 border-amber-500/60 rounded-2xl p-5 text-center shadow-2xl">
+                <span class="inline-block px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-extrabold uppercase tracking-widest mb-2">
+                  GÜNCEL OLAY
+                </span>
+                <p id="current-event-text" class="text-base md:text-lg font-extrabold text-white leading-snug">
+                  Masada 4 oyuncu tamamlandığında olay kartı burada açılacak.
+                </p>
+              </div>
+
+              <!-- Ortaya Atılan Meme Kartları Alanı -->
+              <div id="center-cards-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-3xl min-h-[185px]">
+                <!-- Dinamik olarak 4 kart yuvası buraya render edilir -->
+              </div>
+
+              <!-- Tur Sonu Sonraki Tur Butonu -->
+              <div id="round-result-bar" class="hidden bg-slate-950/90 border border-emerald-500/40 px-5 py-3 rounded-2xl flex items-center gap-4">
+                <span id="round-winner-text" class="text-sm font-bold text-emerald-300"></span>
+                <button id="next-round-btn" onclick="advanceNextRound()" class="px-4 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs transition">
+                  Sonraki Tura Geç
+                </button>
+              </div>
+
+            </div>
+
+            <!-- DOĞU KOLTUĞU -->
+            <div class="lg:col-span-2 flex justify-center">
+              <div id="seat-east" class="bg-slate-950/85 border border-slate-700/80 rounded-2xl px-4 py-2.5 min-w-[155px] text-center backdrop-blur-sm transition-all">
+                <span class="text-[10px] uppercase tracking-wider text-slate-400 block">Doğu Koltuğu</span>
+                <div class="font-bold text-sm text-slate-300 mt-0.5">Boş Koltuk</div>
+                <div class="text-xs text-amber-400 font-bold mt-0.5">0 Puan</div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- GÜNEY KOLTUĞU (SEN) -->
+          <div class="flex justify-center">
+            <div id="seat-south" class="bg-slate-950/90 border border-amber-500/50 rounded-2xl px-5 py-2.5 min-w-[190px] text-center backdrop-blur-sm transition-all">
+              <span class="text-[10px] uppercase tracking-wider text-amber-400 block">Senin Koltuğun</span>
+              <div class="font-extrabold text-sm text-white mt-0.5" id="south-player-name">Oyuncu</div>
+              <div class="text-xs text-amber-400 font-bold mt-0.5" id="south-player-score">0 Puan</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Senin Elindeki Kartlar -->
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-extrabold uppercase tracking-wider text-slate-300">Senin Elindeki Meme Kartları</h3>
+            <span id="hand-instruction" class="text-xs text-slate-400">Sıra sana geldiğinde kart seçip ortaya atabilirsin.</span>
+          </div>
+          <div id="player-hand-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5">
+            <!-- Oyuncunun elindeki 5 fotoğraf meme kartı -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- SEKME 2: MEME YÜKLE -->
+    <section id="tab-upload" class="hidden max-w-2xl mx-auto space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl p-8 space-y-6 shadow-xl">
+        <div>
+          <h2 class="text-2xl font-extrabold">Fotoğraf Meme Yükle</h2>
+          <p class="text-sm text-slate-400 mt-1">Yüklediğin fotoğraflar otomatik sıkıştırılarak Firebase havuzuna kaydedilir ve tüm masalarda dağıtılır. Birden fazla fotoğraf seçebilirsin.</p>
+        </div>
+
+        <label for="meme-file-input" class="border-2 border-dashed border-slate-700 hover:border-amber-500 bg-slate-950/60 rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition group">
+          <div class="w-14 h-14 rounded-2xl bg-slate-900 group-hover:bg-amber-500/20 flex items-center justify-center text-2xl mb-3 transition">
+            🖼️
+          </div>
+          <span class="font-bold text-base text-white">Fotoğrafları Seç veya Buraya Sürükle</span>
+          <span class="text-xs text-slate-400 mt-1">JPG, PNG, WEBP desteklenir (Çoklu seçim yapılabilir)</span>
+          <input type="file" id="meme-file-input" accept="image/*" multiple class="hidden" onchange="handleMemeUpload(event)" />
+        </label>
+
+        <div id="upload-feedback" class="hidden text-sm font-semibold text-center p-3 rounded-xl"></div>
+      </div>
+    </section>
+
+    <!-- SEKME 3: MEME HAVUZU -->
+    <section id="tab-pool" class="hidden space-y-5">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-xl font-extrabold">Kayıtlı Meme Havuzu</h2>
+          <p class="text-xs text-slate-400">Oyunlarda dağıtılan tüm kullanıcı memeleri (En az 12 kart olması önerilir).</p>
+        </div>
+        <button onclick="switchTab('upload')" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold transition">
+          + Yeni Meme Ekle
+        </button>
+      </div>
+
+      <div id="meme-pool-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        <!-- Havuzdaki memeler -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MAÇ SONU ŞAMPİYONLUK EKRANI (MODAL) -->
+  <div id="match-over-modal" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-amber-500/40 rounded-3xl max-w-lg w-full p-8 text-center space-y-6 shadow-2xl">
+      <div class="w-16 h-16 mx-auto rounded-2xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-3xl">
+        🏆
+      </div>
+      <div>
+        <span class="text-xs font-extrabold uppercase tracking-widest text-amber-400">MAÇ TAMAMLANDI</span>
+        <h2 id="champion-title" class="text-2xl font-black text-white mt-1">Kazanan: Oyuncu</h2>
+      </div>
+
+      <div id="final-scoreboard" class="space-y-2.5 text-left">
+        <!-- Final puan sıralaması -->
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 pt-2">
+        <button id="rematch-btn" onclick="restartMatchInRoom()" class="py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-sm transition">
+          Yeni Maç Başlat
+        </button>
+        <button onclick="leaveRoom()" class="py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm transition">
+          Masadan Ayrıl
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK ve Oyun Mantığı -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Senin Firebase projenin (memegame-3e617) yapılandırma bilgileri
+    const GITHUB_PAGES_FALLBACK_CONFIG = {
+      apiKey: "AIzaSyDj65dKQUuzy5rd3GT2irHzjtg-tsJOy-o",
+      authDomain: "memegame-3e617.firebaseapp.com",
+      databaseURL: "https://memegame-3e617-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "memegame-3e617",
+      storageBucket: "memegame-3e617.firebasestorage.app",
+      messagingSenderId: "481283009408",
+      appId: "1:481283009408:web:2820e0df5c33243cbdaf65",
+      measurementId: "G-TPRJ8SW5YB"
+    };
+
+    const firebaseConfig = typeof __firebase_config !== 'undefined'
+      ? JSON.parse(__firebase_config)
+      : GITHUB_PAGES_FALLBACK_CONFIG;
+
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'memegame-3e617';
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // Genişletilmiş 48 Tekrarsız Olay Kartı Havuzu
+    const EVENT_CARDS = [
+      "Pazartesi sabahı 07:30 alarmı çaldığında hayata bakış açım:",
+      "Sınav kağıdını önüme koyduklarında ilk soruyu okurken ben:",
+      "Arkadaş ortamında 'Hesabı ben öderim' dedikten sonra pos cihazı gelince:",
+      "Annem misafirlerin yanında çocukluk anılarımı anlatmaya başladığında:",
+      "Kargo takip ekranında 'Teslim edildi' yazıp kapıda kimse olmayınca:",
+      "Diyete başladıktan 2 saat sonra gece 01:30'da mutfakta yakalanınca:",
+      "Hocanın 'Bu konuyu zaten biliyorsunuzdur' deyip geçtiği yeri sınavda görünce:",
+      "Yanlışlıkla eski sevgilinin 4 yıl önceki fotoğrafını beğenince:",
+      "Maaş yattıktan 15 dakika sonra faturaları ödeyince kalan bakiye:",
+      "Berbere 'Sadece uçlarından al' dedikten sonra aynaya bakınca:",
+      "Grup ödevinde hiçbir şey yapmayıp sunum günü en çok konuşan arkadaş:",
+      "Gece yatmadan önce beynimin 6 yıl önce yaptığım utanç verici şeyi hatırlatması:",
+      "İnternet kesildiğinde modemi kapatıp açtıktan sonraki o 30 saniyelik bekleyiş:",
+      "Arkadaşıma '5 dakikaya oradayım' yazarken henüz yataktan kalkmamışken:",
+      "Patron cuma günü mesai bitimine 5 dakika kala 'Kısa bir toplantı yapalım' deyince:",
+      "Kalabalık otobüste kulaklığın kablosu çıkıp son ses şarkı dışarı verilince:",
+      "Yeni aldığım beyaz ayakkabıya ilk adımda biri basınca:",
+      "Doktorun 'Stresten uzak durmalısın' tavsiyesini dinlerken banka hesabımı hatırlamam:",
+      "Misafirlikte sevmediğim yemeği tabağıma tepeleme doldurduklarında:",
+      "Oyun tam en heyecanlı yerinde elektrikler gidince:",
+      "Uzun zamandır görmediğim tanıdıkla sokakta karşılaşıp adını hatırlamaya çalışırken:",
+      "Kredi kartı ekstresini açtığımda 'Bunu ben mi harcamışım?' tepkim:",
+      "Sınıfta kimse parmak kaldırmazken hocayla göz göze geldiğim o an:",
+      "Telefonu şarja takmayı unutup sabah %3 şarjla uyanınca:",
+      "Arkadaşım 'Sana bir sır vereceğim ama kimseye söyleme' dediğinde:",
+      "Evde tek başınayken mutfaktan garip bir ses gelince:",
+      "Yemek siparişinin 1 saati geçip 'Restoran siparişinizi hazırlıyor' yazısında takılı kalması:",
+      "Çok komik bir espri yaptıktan sonra ortamda derin bir sessizlik olunca:",
+      "Trafikte yeşil ışık yandığı milisaniyede arkadaki aracın kornaya basması:",
+      "Bilgisayar güncellemesi %99'da 40 dakika boyunca takılı kalınca:",
+      "Tatilden döndükten sonraki ilk iş/okul günü sabahı:",
+      "Birine sesli mesaj atarken arkadan annemin bağırma sesi girince:",
+      "Sadece ekmek almaya diye girip marketten 800 TL'lik poşetle çıkınca:",
+      "Biri bana 'Sakin ol' dediğinde sinir katsayımın yükselme hızı:",
+      "Gece sivrisinek vızıltısını duyup ışığı açınca sineğin kaybolması:",
+      "Önemli bir toplantıda mikrofonun açık kaldığını fark ettiğim an:",
+      "Eski fotoğraflarıma bakıp 'Bu kombini nasıl giymişim?' dediğimde:",
+      "Yazılım kodunda tek bir noktalı virgül yüzünden 3 saat hata aradıktan sonra:",
+      "Arkadaşımın yaptığı berbat şakaya ayıp olmasın diye gülerken:",
+      "Asansörde hiç tanımadığım biriyle 15 kat boyunca sessizce çıkarken:",
+      "Sınavdan çıkıp arkadaşlarla cevapları karşılaştırırken herkesin farklı sonuç bulması:",
+      "Kışın sıcacık yorganın altından tuvalete kalkmak zorunda kalınca:",
+      "Biri telefonumdan bir fotoğrafa bakarken parmağını yana kaydırmaya başlayınca:",
+      "Spor salonuna yazılıp sadece ilk 2 gün gittikten sonraki halim:",
+      "Küçük kuzenim 'Telefonunda oyun var mı?' diye yanıma yaklaşınca:",
+      "İndirim var diye hiç ihtiyacım olmayan bir şeyi aldıktan sonraki pişmanlık:",
+      "Tam uykuya dalacakken ayağımın boşluğa düşme hissiyle sıçramam:",
+      "Hafta sonu planı iptal olunca içimde oluşan gizli mutluluk:"
+    ];
+
+    let currentUser = null;
+    let memePool = [];
+    let currentRoomId = null;
+    let roomUnsubscribe = null;
+    let botTimer = null;
+
+    // Firestore Koleksiyon Yolları
+    const getMemesCollection = () => collection(db, 'artifacts', appId, 'public', 'data', 'memes');
+    const getRoomsCollection = () => collection(db, 'artifacts', appId, 'public', 'data', 'rooms');
+
+    // Kimlik Doğrulama Başlatma
+    async function initAuth() {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.error("Auth hatası:", err);
+        document.getElementById('connection-status').textContent = "Bağlantı hatası (Firebase Auth kontrol edin)";
+        document.getElementById('connection-status').className = "text-[11px] text-rose-400 font-medium";
+      }
+    }
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        currentUser = user;
+        const statusEl = document.getElementById('connection-status');
+        statusEl.textContent = "Çevrimiçi • Firebase Bağlı";
+        statusEl.className = "text-[11px] text-emerald-400 font-semibold";
+        listenToMemePool();
+      }
+    });
+
+    initAuth();
+
+    // Meme Havuzunu Gerçek Zamanlı Dinle
+    function listenToMemePool() {
+      onSnapshot(getMemesCollection(), (snapshot) => {
+        memePool = [];
+        snapshot.forEach(docSnap => {
+          memePool.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        document.getElementById('pool-count-badge').textContent = memePool.length;
+        renderMemePool();
+      }, (err) => {
+        console.error("Meme havuzu okuma hatası:", err);
+      });
+    }
+
+    // Sekme Geçişleri
+    window.switchTab = function(tabName) {
+      ['table', 'upload', 'pool'].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.add('hidden');
+        const btn = document.getElementById(`tab-btn-${t}`);
+        btn.classList.remove('bg-amber-500', 'text-slate-950');
+        btn.classList.add('text-slate-400');
+      });
+      document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`tab-btn-${tabName}`);
+      activeBtn.classList.add('bg-amber-500', 'text-slate-950');
+      activeBtn.classList.remove('text-slate-400');
+    };
+
+    // Fotoğraf Sıkıştırma ve Firebase'e Yükleme
+    window.handleMemeUpload = async function(event) {
+      const files = Array.from(event.target.files);
+      if (!files.length || !currentUser) return;
+
+      const feedback = document.getElementById('upload-feedback');
+      feedback.classList.remove('hidden', 'bg-rose-500/20', 'text-rose-300', 'bg-emerald-500/20', 'text-emerald-300');
+      feedback.classList.add('bg-amber-500/20', 'text-amber-300');
+      feedback.textContent = `${files.length} fotoğraf işleniyor ve yükleniyor...`;
+
+      let uploadedCount = 0;
+      for (const file of files) {
+        try {
+          const compressedDataUrl = await compressImage(file, 480, 0.72);
+          await addDoc(getMemesCollection(), {
+            imageUrl: compressedDataUrl,
+            uploadedBy: currentUser.uid,
+            createdAt: serverTimestamp()
+          });
+          uploadedCount++;
+        } catch (err) {
+          console.error("Fotoğraf yükleme hatası:", err);
+        }
+      }
+
+      feedback.classList.remove('bg-amber-500/20', 'text-amber-300');
+      feedback.classList.add('bg-emerald-500/20', 'text-emerald-300');
+      feedback.textContent = `${uploadedCount} meme fotoğrafı başarıyla havuza eklendi!`;
+      event.target.value = "";
+    };
+
+    function compressImage(file, maxWidth, quality) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function renderMemePool() {
+      const grid = document.getElementById('meme-pool-grid');
+      if (memePool.length === 0) {
+        grid.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400 text-sm bg-slate-900/50 rounded-2xl border border-slate-800">Henüz hiç meme fotoğrafı yüklenmemiş. Oyunu oynamak için "Meme Yükle" sekmesinden fotoğraf ekleyin.</div>`;
+        return;
+      }
+      grid.innerHTML = memePool.map(m => `
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden group relative aspect-square">
+          <img src="${m.imageUrl}" class="w-full h-full object-cover" loading="lazy" />
+          ${m.uploadedBy === currentUser?.uid ? `
+            <button onclick="deleteMeme('${m.id}')" class="absolute top-2 right-2 bg-rose-600/90 hover:bg-rose-500 text-white text-[11px] font-bold px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition">
+              Sil
+            </button>
+          ` : ''}
+        </div>
+      `).join('');
+    }
+
+    window.deleteMeme = async function(memeId) {
+      try {
+        await deleteDoc(doc(getMemesCollection(), memeId));
+      } catch (e) {
+        console.error("Silme hatası:", e);
+      }
+    };
+
+    function showLobbyWarning(msg) {
+      const el = document.getElementById('lobby-warning');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    // Yeni Oda Oluştur
+    window.createRoom = async function() {
+      if (!currentUser) return showLobbyWarning("Firebase bağlantısı henüz hazır değil.");
+      if (memePool.length < 8) {
+        showLobbyWarning(`Oyun için havuzda en az 8 meme fotoğrafı olmalı (Şu an: ${memePool.length}). Lütfen önce 'Meme Yükle' sekmesinden fotoğraf ekleyin.`);
+        return;
+      }
+
+      const name = document.getElementById('player-name-input').value.trim() || "Oyuncu 1";
+      const totalRounds = parseInt(document.getElementById('total-rounds-select').value, 10) || 5;
+      const roomCode = Math.floor(1000 + Math.random() * 9000).toString();
+
+      const roomData = {
+        code: roomCode,
+        hostId: currentUser.uid,
+        status: 'waiting', // waiting | playing | voting | round_result | match_over
+        totalRounds: totalRounds,
+        currentRound: 0,
+        currentEvent: "",
+        usedEventIndices: [],
+        usedMemeIds: [],
+        turnIndex: 0,
+        players: [
+          {
+            uid: currentUser.uid,
+            name: name,
+            score: 0,
+            isBot: false,
+            hand: []
+          }
+        ],
+        tableCards: [], // { uid, name, memeId, imageUrl, votes: [] }
+        createdAt: serverTimestamp()
+      };
+
+      await setDoc(doc(getRoomsCollection(), roomCode), roomData);
+      subscribeToRoom(roomCode);
+    };
+
+    // Odaya Katıl
+    window.joinRoom = async function() {
+      if (!currentUser) return showLobbyWarning("Firebase bağlantısı henüz hazır değil.");
+      const code = document.getElementById('join-code-input').value.trim();
+      if (code.length !== 4) return showLobbyWarning("Lütfen 4 haneli masa kodunu girin.");
+
+      const roomRef = doc(getRoomsCollection(), code);
+      const snap = await getDoc(roomRef);
+      if (!snap.exists()) return showLobbyWarning("Bu koda sahip bir masa bulunamadı.");
+
+      const data = snap.data();
+      const alreadyIn = data.players.some(p => p.uid === currentUser.uid);
+
+      if (!alreadyIn) {
+        if (data.players.length >= 4) return showLobbyWarning("Bu masa dolu (4/4 oyuncu).");
+        if (data.status !== 'waiting') return showLobbyWarning("Bu masada oyun çoktan başlamış.");
+
+        const name = document.getElementById('player-name-input').value.trim() || `Oyuncu ${data.players.length + 1}`;
+        const updatedPlayers = [...data.players, {
+          uid: currentUser.uid,
+          name: name,
+          score: 0,
+          isBot: false,
+          hand: []
+        }];
+        await updateDoc(roomRef, { players: updatedPlayers });
+      }
+
+      subscribeToRoom(code);
+    };
+
+    // Oda Değişikliklerini Dinle
+    function subscribeToRoom(roomCode) {
+      if (roomUnsubscribe) roomUnsubscribe();
+      currentRoomId = roomCode;
+
+      document.getElementById('lobby-warning').classList.add('hidden');
+      document.getElementById('lobby-view').classList.add('hidden');
+      document.getElementById('active-room-view').classList.remove('hidden');
+      document.getElementById('room-code-display').textContent = roomCode;
+
+      roomUnsubscribe = onSnapshot(doc(getRoomsCollection(), roomCode), (snap) => {
+        if (!snap.exists()) {
+          leaveRoom();
+          return;
+        }
+        const room = snap.data();
+        renderRoomState(room);
+        handleBotAutomation(room);
+      });
+    }
+
+    // Boş Koltuklara Bot Ekle ve Maçı Başlat
+    window.fillWithBotsAndStart = async function() {
+      if (!currentRoomId) return;
+      const roomRef = doc(getRoomsCollection(), currentRoomId);
+      const snap = await getDoc(roomRef);
+      if (!snap.exists()) return;
+
+      const room = snap.data();
+      const botNames = ["Bot Kerem", "Bot Zeynep", "Bot Mert", "Bot Selin"];
+      const players = [...room.players];
+
+      let botIdx = 0;
+      while (players.length < 4) {
+        players.push({
+          uid: `bot_${Date.now()}_${players.length}`,
+          name: botNames[botIdx++ % botNames.length],
+          score: 0,
+          isBot: true,
+          hand: []
+        });
+      }
+
+      await updateDoc(roomRef, { players });
+      await startMatch();
+    };
+
+    // Tekrarsız Kart Çekme Yardımcısı
+    function drawUniqueMemes(count, usedIds) {
+      let available = memePool.filter(m => !usedIds.includes(m.id));
+      // Eğer tüm havuz tükendiyse mecburi olarak havuzu yeniden karıştır
+      if (available.length < count) {
+        available = [...memePool];
+      }
+      const shuffled = available.sort(() => Math.random() - 0.5);
+      return shuffled.slice(0, count);
+    }
+
+    // Tekrarsız Olay Çekme Yardımcısı
+    function pickUniqueEvent(usedEventIndices) {
+      let availableIndices = EVENT_CARDS.map((_, idx) => idx).filter(idx => !usedEventIndices.includes(idx));
+      if (availableIndices.length === 0) {
+        availableIndices = EVENT_CARDS.map((_, idx) => idx);
+      }
+      const chosenIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+      return { text: EVENT_CARDS[chosenIndex], index: chosenIndex };
+    }
+
+    // Maçı Başlat
+    window.startMatch = async function() {
+      if (!currentRoomId) return;
+      if (memePool.length < 4) {
+        alert("Oyunu başlatmak için havuzda en az 4 meme fotoğrafı bulunmalıdır.");
+        return;
+      }
+
+      const roomRef = doc(getRoomsCollection(), currentRoomId);
+      const snap = await getDoc(roomRef);
+      const room = snap.data();
+
+      const usedMemeIds = [];
+      const handSize = Math.min(5, Math.max(1, Math.floor(memePool.length / 4)));
+
+      const updatedPlayers = room.players.map(p => {
+        const drawn = drawUniqueMemes(handSize, usedMemeIds);
+        drawn.forEach(c => usedMemeIds.push(c.id));
+        return {
+          ...p,
+          score: 0,
+          hand: drawn.map(c => ({ id: c.id, imageUrl: c.imageUrl }))
+        };
+      });
+
+      const ev = pickUniqueEvent([]);
+
+      await updateDoc(roomRef, {
+        status: 'playing',
+        currentRound: 1,
+        currentEvent: ev.text,
+        usedEventIndices: [ev.index],
+        usedMemeIds: usedMemeIds,
+        turnIndex: 0,
+        players: updatedPlayers,
+        tableCards: []
+      });
+    };
+
+    // Kart Oyna (Sıra Sendeyse)
+    window.playCardFromHand = async function(cardIndex) {
+      if (!currentRoomId || !currentUser) return;
+      const roomRef = doc(getRoomsCollection(), currentRoomId);
+      const snap = await getDoc(roomRef);
+      const room = snap.data();
+
+      if (room.status !== 'playing') return;
+      const activePlayer = room.players[room.turnIndex];
+      if (!activePlayer || activePlayer.uid !== currentUser.uid) return;
+
+      const selectedCard = activePlayer.hand[cardIndex];
+      if (!selectedCard) return;
+
+      await executeCardPlay(roomRef, room, room.turnIndex, cardIndex);
+    };
+
+    async function executeCardPlay(roomRef, room, playerIdx, cardIdx) {
+      const players = JSON.parse(JSON.stringify(room.players));
+      const player = players[playerIdx];
+      const playedCard = player.hand.splice(cardIdx, 1)[0];
+
+      // Eline tekrarsız 1 yeni kart çek
+      const usedMemeIds = [...(room.usedMemeIds || [])];
+      const replacement = drawUniqueMemes(1, usedMemeIds)[0];
+      if (replacement) {
+        usedMemeIds.push(replacement.id);
+        player.hand.push({ id: replacement.id, imageUrl: replacement.imageUrl });
+      }
+
+      const tableCards = [...room.tableCards, {
+        uid: player.uid,
+        name: player.name,
+        memeId: playedCard.id,
+        imageUrl: playedCard.imageUrl,
+        votes: []
+      }];
+
+      const nextTurn = (room.turnIndex + 1) % players.length;
+      const allPlayed = tableCards.length >= players.length;
+
+      await updateDoc(roomRef, {
+        players,
+        tableCards,
+        usedMemeIds,
+        turnIndex: nextTurn,
+        status: allPlayed ? 'voting' : 'playing'
+      });
+    }
+
+    // Ortadaki Karta Oy Ver
+    window.voteForCard = async function(targetUid) {
+      if (!currentRoomId || !currentUser) return;
+      if (targetUid === currentUser.uid) return; // Kendi kartına oy veremez
+
+      const roomRef = doc(getRoomsCollection(), currentRoomId);
+      const snap = await getDoc(roomRef);
+      const room = snap.data();
+      if (room.status !== 'voting') return;
+
+      // Kullanıcı daha önce oy vermiş mi kontrol et
+      const alreadyVoted = room.tableCards.some(c => c.votes.includes(currentUser.uid));
+      if (alreadyVoted) return;
+
+      const updatedCards = room.tableCards.map(c => {
+        if (c.uid === targetUid) {
+          return { ...c, votes: [...c.votes, currentUser.uid] };
+        }
+        return c;
+      });
+
+      await checkAndFinalizeVoting(roomRef, room, updatedCards);
+    };
+
+    async function checkAndFinalizeVoting(roomRef, room, updatedCards) {
+      const totalVotes = updatedCards.reduce((sum, c) => sum + c.votes.length, 0);
+      if (totalVotes >= room.players.length) {
+        // Puanları hesapla (Her oy +100 puan)
+        const players = room.players.map(p => {
+          const card = updatedCards.find(c => c.uid === p.uid);
+          const gained = card ? card.votes.length * 100 : 0;
+          return { ...p, score: p.score + gained };
+        });
+
+        const isLastRound = room.currentRound >= room.totalRounds;
+        await updateDoc(roomRef, {
+          players,
+          tableCards: updatedCards,
+          status: isLastRound ? 'match_over' : 'round_result'
+        });
+      } else {
+        await updateDoc(roomRef, { tableCards: updatedCards });
+      }
+    }
+
+    // Sonraki Tura Geç (Oda Kurucusu)
+    window.advanceNextRound = async function() {
+      if (!currentRoomId) return;
+      const roomRef = doc(getRoomsCollection(), currentRoomId);
+      const snap = await getDoc(roomRef);
+      const room = snap.data();
+
+      const usedEvents = [...(room.usedEventIndices || [])];
+      const ev = pickUniqueEvent(usedEvents);
+      usedEvents.push(ev.index);
+
+      await updateDoc(roomRef, {
+        status: 'playing',
+        currentRound: room.currentRound + 1,
+        currentEvent: ev.text,
+        usedEventIndices: usedEvents,
+        tableCards: []
+      });
+    };
+
+    // Aynı Masada Yeni Maç Başlat
+    window.restartMatchInRoom = async function() {
+      document.getElementById('match-over-modal').classList.add('hidden');
+      await startMatch();
+    };
+
+    // Masadan Ayrıl
+    window.leaveRoom = async function() {
+      if (botTimer) clearTimeout(botTimer);
+      if (roomUnsubscribe) {
+        roomUnsubscribe();
+        roomUnsubscribe = null;
+      }
+
+      if (currentRoomId && currentUser) {
+        try {
+          const roomRef = doc(getRoomsCollection(), currentRoomId);
+          const snap = await getDoc(roomRef);
+          if (snap.exists()) {
+            const room = snap.data();
+            const remaining = room.players.filter(p => !p.isBot && p.uid !== currentUser.uid);
+            if (remaining.length === 0) {
+              await deleteDoc(roomRef);
+            } else {
+              const allRemaining = room.players.filter(p => p.uid !== currentUser.uid);
+              await updateDoc(roomRef, {
+                players: allRemaining,
+                hostId: remaining[0].uid
+              });
+            }
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      currentRoomId = null;
+      document.getElementById('match-over-modal').classList.add('hidden');
+      document.getElementById('active-room-view').classList.add('hidden');
+      document.getElementById('lobby-view').classList.remove('hidden');
+    };
+
+    // Bot Otomasyonu (Yalnızca Host İstemcide Çalışır)
+    function handleBotAutomation(room) {
+      if (botTimer) clearTimeout(botTimer);
+      if (!currentUser || room.hostId !== currentUser.uid) return;
+
+      if (room.status === 'playing') {
+        const activePlayer = room.players[room.turnIndex];
+        if (activePlayer && activePlayer.isBot) {
+          botTimer = setTimeout(async () => {
+            const roomRef = doc(getRoomsCollection(), currentRoomId);
+            const snap = await getDoc(roomRef);
+            if (!snap.exists()) return;
+            const freshRoom = snap.data();
+            if (freshRoom.status === 'playing' && freshRoom.players[freshRoom.turnIndex]?.uid === activePlayer.uid) {
+              const randomCardIdx = Math.floor(Math.random() * activePlayer.hand.length);
+              await executeCardPlay(roomRef, freshRoom, freshRoom.turnIndex, randomCardIdx);
+            }
+          }, 1100);
+        }
+      } else if (room.status === 'voting') {
+        const votedUids = room.tableCards.flatMap(c => c.votes);
+        const unvotedBot = room.players.find(p => p.isBot && !votedUids.includes(p.uid));
+        if (unvotedBot) {
+          botTimer = setTimeout(async () => {
+            const roomRef = doc(getRoomsCollection(), currentRoomId);
+            const snap = await getDoc(roomRef);
+            if (!snap.exists()) return;
+            const freshRoom = snap.data();
+            if (freshRoom.status !== 'voting') return;
+
+            const candidates = freshRoom.tableCards.filter(c => c.uid !== unvotedBot.uid);
+            const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+            if (chosen) {
+              const updatedCards = freshRoom.tableCards.map(c =>
+                c.uid === chosen.uid ? { ...c, votes: [...c.votes, unvotedBot.uid] } : c
+              );
+              await checkAndFinalizeVoting(roomRef, freshRoom, updatedCards);
+            }
+          }, 900);
+        }
+      }
+    }
+
+    // Masa Arayüzünü Render Et
+    function renderRoomState(room) {
+      const isHost = room.hostId === currentUser?.uid;
+      const myIndex = room.players.findIndex(p => p.uid === currentUser?.uid);
+      const myPlayer = myIndex !== -1 ? room.players[myIndex] : room.players[0];
+
+      // Buton Görünürlükleri
+      const fillBotsBtn = document.getElementById('fill-bots-btn');
+      const startMatchBtn = document.getElementById('start-match-btn');
+      fillBotsBtn.classList.toggle('hidden', !(isHost && room.status === 'waiting' && room.players.length < 4));
+      startMatchBtn.classList.toggle('hidden', !(isHost && room.status === 'waiting' && room.players.length === 4));
+
+      // Üst Bilgi Çubuğu
+      const roundInd = document.getElementById('round-indicator');
+      const turnText = document.getElementById('turn-status-text');
+
+      if (room.status === 'waiting') {
+        roundInd.textContent = `BEKLEME ODASI (${room.players.length}/4 OYUNCU) • ${room.totalRounds} TUR`;
+        turnText.textContent = room.players.length < 4
+          ? "Arkadaşlarının katılmasını bekleyebilir veya bot ekleyerek hemen başlayabilirsin."
+          : "Masa doldu! Kurucunun maçı başlatması bekleniyor.";
+      } else {
+        roundInd.textContent = `TUR ${room.currentRound} / ${room.totalRounds}`;
+        if (room.status === 'playing') {
+          const activeP = room.players[room.turnIndex];
+          turnText.textContent = activeP?.uid === currentUser?.uid
+            ? "SIRA SENDE! Aşağıdaki elinden bir meme kartı seç."
+            : `Sıra ${activeP?.name} adlı oyuncuda...`;
+        } else if (room.status === 'voting') {
+          turnText.textContent = "TÜM KARTLAR AÇILDI! En komik bulduğun karta oy ver.";
+        } else if (room.status === 'round_result') {
+          turnText.textContent = "Tur oylaması tamamlandı!";
+        }
+      }
+
+      // Koltukları Saat Yönünde Yerleştir (Güney = Sen, Batı = +1, Kuzey = +2, Doğu = +3)
+      const baseIdx = myIndex !== -1 ? myIndex : 0;
+      const seatOrder = [
+        { id: 'seat-south', offset: 0, label: 'Senin Koltuğun' },
+        { id: 'seat-west', offset: 1, label: 'Batı Koltuğu' },
+        { id: 'seat-north', offset: 2, label: 'Kuzey Koltuğu' },
+        { id: 'seat-east', offset: 3, label: 'Doğu Koltuğu' }
+      ];
+
+      seatOrder.forEach(seat => {
+        const playerIdx = (baseIdx + seat.offset) % 4;
+        const player = room.players[playerIdx];
+        const el = document.getElementById(seat.id);
+        const isTurn = room.status === 'playing' && room.turnIndex === playerIdx;
+
+        el.classList.toggle('active-turn-ring', isTurn);
+
+        if (seat.id === 'seat-south') {
+          document.getElementById('south-player-name').textContent = player ? player.name : 'Sen';
+          document.getElementById('south-player-score').textContent = `${player ? player.score : 0} Puan`;
+        } else {
+          if (player) {
+            el.innerHTML = `
+              <span class="text-[10px] uppercase tracking-wider text-slate-400 block">${seat.label}</span>
+              <div class="font-bold text-sm text-white mt-0.5">${player.name}</div>
+              <div class="text-xs text-amber-400 font-bold mt-0.5">${player.score} Puan</div>
+            `;
+          } else {
+            el.innerHTML = `
+              <span class="text-[10px] uppercase tracking-wider text-slate-500 block">${seat.label}</span>
+              <div class="font-semibold text-sm text-slate-500 mt-0.5">Boş Koltuk</div>
+              <div class="text-xs text-slate-600 mt-0.5">-</div>
+            `;
+          }
+        }
+      });
+
+      // Olay Kartı
+      document.getElementById('current-event-text').textContent = room.currentEvent || "Masada 4 oyuncu tamamlandığında olay kartı burada açılacak.";
+
+      // Ortadaki Kartlar
+      const centerGrid = document.getElementById('center-cards-grid');
+      const revealCards = room.status === 'voting' || room.status === 'round_result' || room.status === 'match_over';
+      const myVoted = room.tableCards.some(c => c.votes.includes(currentUser?.uid));
+
+      let slotsHtml = '';
+      for (let i = 0; i < 4; i++) {
+        const card = room.tableCards[i];
+        if (!card) {
+          slotsHtml += `
+            <div class="border-2 border-dashed border-emerald-700/50 rounded-2xl aspect-square flex items-center justify-center text-emerald-300/40 text-xs font-semibold">
+              Kart Bekleniyor
+            </div>
+          `;
+        } else if (!revealCards) {
+          slotsHtml += `
+            <div class="bg-gradient-to-br from-amber-500 to-rose-600 border-2 border-amber-300 rounded-2xl aspect-square flex flex-col items-center justify-center p-3 text-center shadow-xl">
+              <span class="text-2xl mb-1">🃏</span>
+              <span class="text-xs font-extrabold text-slate-950">${card.name}</span>
+              <span class="text-[10px] font-bold text-slate-900/80 mt-0.5">Kartını Attı</span>
+            </div>
+          `;
+        } else {
+          const isMine = card.uid === currentUser?.uid;
+          const canVote = room.status === 'voting' && !isMine && !myVoted;
+          slotsHtml += `
+            <div onclick="${canVote ? `voteForCard('${card.uid}')` : ''}"
+              class="bg-slate-950 border-2 ${canVote ? 'border-amber-400 cursor-pointer card-hover' : 'border-slate-700'} rounded-2xl overflow-hidden flex flex-col justify-between shadow-xl">
+              <div class="aspect-square w-full overflow-hidden relative">
+                <img src="${card.imageUrl}" class="w-full h-full object-cover" />
+                ${room.status !== 'voting' ? `
+                  <div class="absolute top-2 right-2 bg-amber-500 text-slate-950 text-xs font-black px-2 py-0.5 rounded-lg shadow">
+                    +${card.votes.length * 100} P
+                  </div>
+                ` : ''}
+              </div>
+              <div class="p-2 bg-slate-900 flex items-center justify-between">
+                <span class="text-[11px] font-bold text-slate-300 truncate">${card.name}</span>
+                ${canVote ? `<span class="text-[10px] font-extrabold text-amber-400">OY VER</span>` : ''}
+              </div>
+            </div>
+          `;
+        }
+      }
+      centerGrid.innerHTML = slotsHtml;
+
+      // Tur Sonu Çubuğu
+      const resultBar = document.getElementById('round-result-bar');
+      if (room.status === 'round_result') {
+        resultBar.classList.remove('hidden');
+        const sortedCards = [...room.tableCards].sort((a, b) => b.votes.length - a.votes.length);
+        const topCard = sortedCards[0];
+        document.getElementById('round-winner-text').textContent = topCard && topCard.votes.length > 0
+          ? `Turun Kazananı: ${topCard.name} (+${topCard.votes.length * 100} Puan)`
+          : "Bu turda eşitlik oldu!";
+        document.getElementById('next-round-btn').classList.toggle('hidden', !isHost);
+      } else {
+        resultBar.classList.add('hidden');
+      }
+
+      // Senin Elindeki Kartlar
+      const handGrid = document.getElementById('player-hand-grid');
+      const isMyTurn = room.status === 'playing' && room.players[room.turnIndex]?.uid === currentUser?.uid;
+      document.getElementById('hand-instruction').textContent = isMyTurn
+        ? "Sıra sende! Oynayacağın karta tıkla."
+        : "Sıra sana geldiğinde kart seçip ortaya atabilirsin.";
+
+      if (myPlayer && myPlayer.hand && myPlayer.hand.length > 0) {
+        handGrid.innerHTML = myPlayer.hand.map((c, idx) => `
+          <div onclick="${isMyTurn ? `playCardFromHand(${idx})` : ''}"
+            class="bg-slate-950 border-2 ${isMyTurn ? 'border-amber-500/80 cursor-pointer card-hover' : 'border-slate-800 opacity-75'} rounded-2xl overflow-hidden aspect-square relative group">
+            <img src="${c.imageUrl}" class="w-full h-full object-cover" />
+            ${isMyTurn ? `
+              <div class="absolute inset-x-0 bottom-0 bg-amber-500 text-slate-950 text-center text-xs font-extrabold py-1.5 opacity-0 group-hover:opacity-100 transition">
+                Ortaya At
+              </div>
+            ` : ''}
+          </div>
+        `).join('');
+      } else {
+        handGrid.innerHTML = `<div class="col-span-full text-center py-6 text-xs text-slate-500">Maç başladığında elindeki 5 fotoğraf meme kartı burada görünecek.</div>`;
+      }
+
+      // Maç Sonu Şampiyonluk Ekranı
+      const matchOverModal = document.getElementById('match-over-modal');
+      if (room.status === 'match_over') {
+        matchOverModal.classList.remove('hidden');
+        const ranked = [...room.players].sort((a, b) => b.score - a.score);
+        const champion = ranked[0];
+        document.getElementById('champion-title').textContent = `Şampiyon: ${champion.name} (${champion.score} Puan)`;
+        document.getElementById('rematch-btn').classList.toggle('hidden', !isHost);
+
+        document.getElementById('final-scoreboard').innerHTML = ranked.map((p, i) => `
+          <div class="flex items-center justify-between px-4 py-3 rounded-xl ${i === 0 ? 'bg-amber-500/20 border border-amber-500/50' : 'bg-slate-950 border border-slate-800'}">
+            <div class="flex items-center gap-3">
+              <span class="font-black text-sm ${i === 0 ? 'text-amber-400' : 'text-slate-400'}">#${i + 1}</span>
+              <span class="font-bold text-sm text-white">${p.name}</span>
+            </div>
+            <span class="font-extrabold text-sm text-amber-400">${p.score} Puan</span>
+          </div>
+        `).join('');
+      } else {
+        matchOverModal.classList.add('hidden');
+      }
+    }
+  </script>
+</body>
+</html>
